@@ -1,0 +1,24 @@
+name: Weather Bot
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, ubuntu, server-for-hasl]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Stop and remove existing container
+        run: |
+          docker stop weather-bot || true
+          docker rm weather-bot || true
+
+      - name: Build and run Docker container
+        run: |
+          docker compose up -d --build
+          
