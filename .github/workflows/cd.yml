@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, ubuntu, server-for-hasl]
+    runs-on: [self-hosted, linux, X64]
 
     steps:
       - name: Checkout repository
