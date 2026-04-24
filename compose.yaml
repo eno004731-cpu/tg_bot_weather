@@ -1,18 +1,10 @@
-# Описываем сервисы, которые будет запускать Docker Compose
 services:
-  # Имя сервиса
   bot:
-    # Собрать образ из текущей папки
-    build: .
-
-    # Имя контейнера
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: weather-bot
-
-    # Подключить переменные окружения из файла .env
-    env_file:
-      - .env
-
-    # Автоматически перезапускать контейнер,
-    # если он остановился с ошибкой или после перезагрузки
+    env_file: .env
+    init: true
     restart: unless-stopped
-    
+    command: ["python", "-u", "bot.py"]

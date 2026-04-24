@@ -1,1 +1,50 @@
+name: CD
 
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: weather-bot-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy weather bot
+    runs-on:
+      - self-hosted
+      - ubuntu
+      - server-for-hasl
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          if [ -z "$BOT_TOKEN" ]; then
+            echo "Missing required secret: BOT_TOKEN"
+            exit 1
+          fi
+
+      - name: Create .env file
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          cat <<EOF > .env
+          BOT_TOKEN=$BOT_TOKEN
+          EOF
+
+      - name: Stop previous container
+        run: docker compose down --remove-orphans || true
+
+      - name: Deploy with Docker Compose
+        run: docker compose up -d --build --force-recreate --remove-orphans
+
+      - name: Remove temporary .env file
+        if: always()
+        run: rm -f .env
