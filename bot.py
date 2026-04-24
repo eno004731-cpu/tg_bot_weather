@@ -71,10 +71,10 @@ async def send_weather(message: Message):
     global user_chat_id
     global data 
     global response
-    user_chat_id = message.chat.id
-    await message.answer(f'Температура: {data["current"]["temperature_2m"]}°C' f'\nСкорость ветра: {data["current"]["wind_speed_10m"]} м/с' f'\nВремя: {data["current"]["time"]}')
     response = requests.get(url, params=params)
     data = response.json()
+    user_chat_id = message.chat.id
+    await message.answer(f'Температура: {data["current"]["temperature_2m"]}°C' f'\nСкорость ветра: {data["current"]["wind_speed_10m"]} м/с' f'\nВремя: {data["current"]["time"]}')
     print(data)
 
 @dp.message(Command("stop_send_weather",))
@@ -120,12 +120,12 @@ async def send_weather1():
 async def send_weather2():   
     global data 
     global response
+    response = requests.get(url, params=params)
+    data = response.json()
     await bot.send_message(chat_id=user_chat_id,
                             text=f'Температура: {data["current"]["temperature_2m"]}°C' 
                             f'\nСкорость ветра: {data["current"]["wind_speed_10m"]} м/с' 
                             f'\nВремя: {data["current"]["time"]}')
-    response = requests.get(url, params=params)
-    data = response.json()
     print(f'это функция которая отправляет погоду раз в 10 минут: {data}')
 
 
