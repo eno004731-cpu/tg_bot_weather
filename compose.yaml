@@ -1,10 +1,26 @@
+name: weather-bot
+
 services:
   bot:
+    image: weather-bot:latest
     build:
       context: .
       dockerfile: Dockerfile
     container_name: weather-bot
-    env_file: .env
+    env_file:
+      - .env
+    environment:
+      NOTES_DB_PATH: /app/data/notes.db
     init: true
     restart: unless-stopped
-    command: ["python", "-u", "bot.py"]
+    stop_grace_period: 20s
+    volumes:
+      - notes_data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  notes_data:
