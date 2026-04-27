@@ -15,8 +15,8 @@ jobs:
     name: Deploy weather bot
     runs-on:
       - self-hosted
-      - ubuntu
-      - server-for-hasl
+      - Linux
+      - weather
 
     steps:
       - name: Checkout repository
