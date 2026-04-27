@@ -3,7 +3,6 @@ import logging
 from datetime import datetime
 from os import getenv
 
-import requests
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -13,18 +12,13 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
+
+from SQL import get_weather_subscribers, set_weather_notification_permission
+
+from comandweather import get_weather_text, router as weather_router
 from notes import configure_reminder_scheduler, router as notes_router
+from countWords import router as count_words_router
 
-
-url = "https://api.open-meteo.com/v1/forecast"
-params = {
-    "latitude": 55.809,
-    "longitude": 37.958,
-    "current": "temperature_2m,wind_speed_10m,weather_code",
-    "timezone": "auto",
-}
-
-user_chat_id: int | None = None
 
 menu = ReplyKeyboardMarkup(
     keyboard=[
@@ -54,6 +48,10 @@ dp = Dispatcher()
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 
+class CountWords(StatesGroup):
+    waiting_for_text = State()
+
+
 async def send_note_reminder(chat_id: int, note_text: str):
     await bot.send_message(chat_id=chat_id, text=f"Напоминание: {note_text}")
 
@@ -67,25 +65,27 @@ def schedule_note_reminder(chat_id: int, note_text: str, reminder_at: datetime) 
     )
 
 
+async def send_scheduled_weather():
+    try:
+        weather_text = get_weather_text()
+    except Exception:
+        logging.exception("Не удалось получить погоду для автоматической отправки")
+        return
+
+    for chat_id in get_weather_subscribers():
+        try:
+            await bot.send_message(chat_id=chat_id, text=weather_text)
+        except Exception:
+            logging.exception("Не удалось отправить погоду в chat_id=%s", chat_id)
+
 configure_reminder_scheduler(schedule_note_reminder)
 dp.include_router(notes_router)
-
-
-def get_weather_text() -> str:
-    response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()["current"]
-    return (
-        f'Температура: {data["temperature_2m"]}°C'
-        f'\nСкорость ветра: {data["wind_speed_10m"]} м/с'
-        f'\nВремя: {data["time"]}'
-    )
+dp.include_router(weather_router)
+dp.include_router(count_words_router)
 
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    global user_chat_id
-    user_chat_id = message.chat.id
     await message.answer("Привет", reply_markup=menu)
 
 
@@ -95,22 +95,9 @@ async def get_chat_id(message: Message):
     await message.answer(f"ID чата: {message.chat.id}")
 
 
-@dp.message(Command("weather", "погода"))
-@dp.message(lambda message: message.text == "погода")
-async def send_weather(message: Message):
-    global user_chat_id
-    user_chat_id = message.chat.id
-
-    try:
-        await message.answer(get_weather_text())
-    except requests.RequestException:
-        await message.answer("Не удалось получить погоду. Попробуй позже.")
-
-
 @dp.message(Command("stop_send_weather"))
 async def stop_send_weather(message: Message):
-    global user_chat_id
-    user_chat_id = None
+    set_weather_notification_permission(message.chat.id, False)
     await message.answer("Отправка погоды остановлена")
 
 
@@ -128,45 +115,13 @@ async def send_help(message: Message):
     )
 
 
-class CountWords(StatesGroup):
-    waiting_for_text = State()
-
-
-@dp.message(Command("Count_words", "подсчет слов"))
-@dp.message(lambda message: message.text == "подсчет слов")
-async def count_words_start(message: Message, state: FSMContext):
-    await message.answer("Напиши текст, и я посчитаю количество слов в нём")
-    await state.set_state(CountWords.waiting_for_text)
-
-
-@dp.message(CountWords.waiting_for_text)
-async def count_words_finish(message: Message, state: FSMContext):
-    text = (message.text or "").strip()
-
-    if not text:
-        await message.answer("Отправь текст сообщением")
-        return
-
-    word_count = len(text.split()) - text.count("-") - text.count("--")
-    await message.answer(f"Количество слов в вашем сообщении: {word_count}")
-    await state.clear()
-
-
-async def send_scheduled_weather():
-    if user_chat_id is None:
-        return
-
-    try:
-        await bot.send_message(chat_id=user_chat_id, text=get_weather_text())
-    except requests.RequestException:
-        print("Не удалось получить погоду для автоматической отправки")
 
 
 
 async def main():
+    logging.basicConfig(level=logging.INFO)
     scheduler.add_job(send_scheduled_weather, "interval", minutes=10)
     scheduler.start()
-    logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 

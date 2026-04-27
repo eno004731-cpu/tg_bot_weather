@@ -158,9 +158,7 @@ async def set_reminder(message: Message, state: FSMContext):
             reminder_at = datetime.strptime(raw_time, time_format)
             break
         except ValueError:
-                await state.set_state(Notes.waiting_for_action)
-                return
-                continue
+            continue
 
     if reminder_at is None:
         await message.answer("Неверный формат времени. Используй ГГГГ-ММ-ДД ЧЧ:ММ")
